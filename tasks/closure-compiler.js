@@ -12,11 +12,16 @@ module.exports = function(grunt) {
   // ==========================================================================
 
   grunt.registerMultiTask('closure-compiler', 'Minify JS files using Closure Compiler.', function() {
-
+    
     var closurePath = '',
         reportFile = '',
         data = this.data,
         done = this.async();
+        
+    if(data.jsOutputFile && data.jsOutputPath){
+      grunt.log.error("Cannot have jsOutputFile & jsOutputPath set at same time.");
+      return false;
+    }
 
     // Check for closure path.
     if (data.closurePath) {
@@ -46,10 +51,10 @@ module.exports = function(grunt) {
       return false;
     }
 
-    // Build command line.
-    command += ' --js "' + data.js.join('" --js "') + '"';
-
     if (data.jsOutputFile) {
+      // Build command line.
+      command += ' --js "' + data.js.join('" --js "') + '"';
+      
       if (!grunt.file.isPathAbsolute(data.jsOutputFile)) {
         data.jsOutputFile = path.resolve('./') + '/' + data.jsOutputFile;
       }
@@ -83,12 +88,28 @@ module.exports = function(grunt) {
         command += ' --' + directive + ' "' + String(data.options[directive]) + '"';
       }
     }
+    
+    if (data.jsOutputFile) {
+      // because closure compiler does not create dirs.
+      grunt.log.writeln("Create File: "+data.jsOutputFile);
+      grunt.file.write(data.jsOutputFile, '');
+    }
+    
+    // Output some size info about a file.
+    function min_info(min, onComplete) {
+      gzip(min, function(err, buffer) {
+        if (err) {
+          onComplete.call(this, err);
+        }
 
-    // because closure compiler does not create dirs.
-    grunt.file.write(data.jsOutputFile, '');
+        var gzipSize = buffer.toString().length;
+        grunt.log.writeln('Compressed size: ' + String((gzipSize / 1024).toFixed(2)).green + ' kb gzipped (' + String(gzipSize).green + ' bytes).');
 
-    // Minify WebGraph class.
-    exec(command, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, function(err, stdout, stderr) {
+        onComplete.call(this, null);
+      });
+    }
+    
+    function processOutput(err, stdout, stderr){
       if (err) {
         grunt.warn(err);
         done(false);
@@ -129,23 +150,28 @@ module.exports = function(grunt) {
         }
         done();
       }
+    }
 
-    });
+    if (data.jsOutputFile) {
+      exec(command, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput);
+    }
 
-  });
-
-  // Output some size info about a file.
-  function min_info(min, onComplete) {
-    gzip(min, function(err, buffer) {
-      if (err) {
-        onComplete.call(this, err);
+    if (data.jsOutputPath) {
+      for(int i = 0; i < data.js.length; i++){
+        var fileCommand = " --js \""+data.js[i]+"\"",
+        fileName = data.js[i].substring(data.js[i].lastIndexOf("/")+1),
+        newFile = data.jsOutputPath+fileName;
+        
+        fileCommand += " --js_output_file \""+newFile+"\"";
+        
+        reportFile = data.reportFile || newFile + '.report.txt';
+        
+        grunt.log.writeln("Create File: "+newFile);
+        grunt.file.write(newFile, '');
+        
+        exec(command+fileCommand, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput); 
       }
-
-      var gzipSize = buffer.toString().length;
-      grunt.log.writeln('Compressed size: ' + String((gzipSize / 1024).toFixed(2)).green + ' kb gzipped (' + String(gzipSize).green + ' bytes).');
-
-      onComplete.call(this, null);
-    });
-  }
+    }
+  });
 
 };
