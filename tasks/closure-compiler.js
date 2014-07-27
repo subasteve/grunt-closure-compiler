@@ -157,14 +157,15 @@ module.exports = function(grunt) {
     }
 
     if (data.jsOutputPath) {
-      for(int i = 0; i < data.js.length; i++){
+      for(var i = 0; i < data.js.length; i++){
         var fileCommand = " --js \""+data.js[i]+"\"",
         fileName = data.js[i].substring(data.js[i].lastIndexOf("/")+1),
         newFile = data.jsOutputPath+fileName;
         
         fileCommand += " --js_output_file \""+newFile+"\"";
         
-        reportFile = data.reportFile || newFile + '.report.txt';
+        //Fatal error: path must be a string
+        //reportFile = data.reportFile || newFile + '.report.txt';
         
         grunt.log.writeln("Create File: "+newFile);
         grunt.file.write(newFile, '');
