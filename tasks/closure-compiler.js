@@ -2,7 +2,7 @@ module.exports = function(grunt) {
 
   'use strict';
 
-  var exec = require('child_process').exec,
+  var execSync = require('exec-sync'),
       fs = require('fs'),
       path = require('path'),
       gzip = require('zlib').gzip;
@@ -94,66 +94,9 @@ module.exports = function(grunt) {
       grunt.log.writeln("Create File: "+data.jsOutputFile);
       grunt.file.write(data.jsOutputFile, '');
     }
-    
-    // Output some size info about a file.
-    function min_info(min, onComplete) {
-      gzip(min, function(err, buffer) {
-        if (err) {
-          onComplete.call(this, err);
-        }
-
-        var gzipSize = buffer.toString().length;
-        grunt.log.writeln('Compressed size: ' + String((gzipSize / 1024).toFixed(2)).green + ' kb gzipped (' + String(gzipSize).green + ' bytes).');
-
-        onComplete.call(this, null);
-      });
-    }
-    
-    function processOutput(err, stdout, stderr){
-      if (err) {
-        grunt.warn(err);
-        done(false);
-      }
-
-      if (stdout) {
-        grunt.log.writeln(stdout);
-      }
-
-      // If OK, calculate gzipped file size.
-      if (reportFile.length) {
-        var min = fs.readFileSync(data.jsOutputFile, 'utf8');
-        min_info(min, function(err) {
-          if (err) {
-            grunt.warn(err);
-            done(false);
-          }
-
-          if (data.noreport) {
-            done();
-          } else {
-            // Write compile report to a file.
-            fs.writeFile(reportFile, stderr, function(err) {
-              if (err) {
-                grunt.warn(err);
-                done(false);
-              }
-
-              grunt.log.writeln('A report is saved in ' + reportFile + '.');
-              done();
-            });
-          }
-
-        });
-      } else {
-        if (data.report) {
-          grunt.log.error(stderr);
-        }
-        done();
-      }
-    }
 
     if (data.jsOutputFile) {
-      exec(command, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput);
+      execSync(command);
     }
 
     if (data.jsOutputPath) {
@@ -170,7 +113,7 @@ module.exports = function(grunt) {
         grunt.log.writeln("Create File: "+newFile);
         grunt.file.write(newFile, '');
         
-        exec(command+fileCommand, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput); 
+        execSync(command+fileCommand); 
       }
     }
   });
