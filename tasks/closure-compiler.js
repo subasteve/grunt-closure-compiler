@@ -42,13 +42,19 @@ module.exports = function(grunt) {
 
     data.cwd = data.cwd || './';
 
+    data.originalJs = data.js;
     data.js = grunt.file.expand({cwd: data.cwd}, data.js);
 
     // Sanitize options passed.
     if (!data.js.length) {
-      // This task requires a minima an input file.
-      grunt.warn('Missing js property.');
-      return false;
+      if(data.originalJs){
+      	grunt.log.writeln("Nothing to process in "+data.originalJs);
+      	done();
+      }else{
+      	// This task requires a minima an input file.
+      	grunt.warn('Missing js property.');
+      	return false;
+      }
     }
 
     if (data.jsOutputFile) {
