@@ -2,7 +2,7 @@ module.exports = function(grunt) {
 
   'use strict';
 
-  var execSync = require('exec-sync'),
+  var exec = require('child_process').exec,
       fs = require('fs'),
       path = require('path'),
       gzip = require('zlib').gzip;
@@ -95,15 +95,40 @@ module.exports = function(grunt) {
       grunt.file.write(data.jsOutputFile, '');
     }
 
+    function processOutput(err, stdout, stderr){
+    	if(err != null){
+		grunt.warn(err);
+	}
+	if(stdout){
+		grunt.log.writeln(stdout);
+	}
+	if(stderr){
+		grunt.log.writeln(stderr);
+	}
+    }
+
     if (data.jsOutputFile) {
-      execSync(command);
+      var doneFile = data.jsOutputFile+".done";
+      exec(command, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput);
+      while (!fs.existsSync(doneFile)) {
+	// Just Chill
+      }
+      if(fs.existsSync(doneFile)){
+	// Delete file
+	fs.unlinkSync(doneFile);
+      }
+      done();
     }
 
     if (data.jsOutputPath) {
+      var doneFiles = [];
       for(var i = 0; i < data.js.length; i++){
         var fileCommand = " --js \""+data.js[i]+"\"",
         fileName = data.js[i].substring(data.js[i].lastIndexOf("/")+1),
-        newFile = data.jsOutputPath+fileName;
+        newFile = data.jsOutputPath+fileName,
+	doneFileName = data.jsOutputPath+fileName+".done";
+
+	doneFiles.push(doneFileName);
         
         fileCommand += " --js_output_file \""+newFile+"\"";
         
@@ -113,8 +138,21 @@ module.exports = function(grunt) {
         grunt.log.writeln("Create File: "+newFile);
         grunt.file.write(newFile, '');
         
-        execSync(command+fileCommand); 
+        exec(command+fileCommand+" && echo done > "+doneFileName, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput); 
       }
+      //Fix for complete before finish bug
+      for(var i = 0; i < doneFiles.length; i++){
+      	// Block the event loop until the command has executed.
+	grunt.log.writeln("Waiting For File: "+doneFiles[i].substring(0,doneFiles[i].lastIndexOf(".")));
+      	while (!fs.existsSync(doneFiles[i])) {
+      		// Just Chill
+      	}
+	if(fs.existsSync(doneFiles[i])){
+		// Delete file
+                fs.unlinkSync(doneFiles[i]);
+	}
+      }
+      done();
     }
   });
 
