@@ -16,7 +16,8 @@ module.exports = function(grunt) {
     var closurePath = '',
         reportFile = '',
         data = this.data,
-        done = this.async();
+        done = this.async(),
+	processed = 0;
         
     if(data.jsOutputFile && data.jsOutputPath){
       grunt.log.error("Cannot have jsOutputFile & jsOutputPath set at same time.");
@@ -95,13 +96,7 @@ module.exports = function(grunt) {
       }
     }
     
-    if (data.jsOutputFile) {
-      // because closure compiler does not create dirs.
-      grunt.log.writeln("Create File: "+data.jsOutputFile);
-      grunt.file.write(data.jsOutputFile, '');
-    }
-
-    function processOutput(err, stdout, stderr){
+    function processOutput(err, stdout, stderr, fileName, newFile){
     	if(err != null){
 		grunt.warn(err);
 	}
@@ -111,55 +106,45 @@ module.exports = function(grunt) {
 	if(stderr){
 		grunt.log.writeln(stderr);
 	}
+
+	if(fileName && newFile){
+		grunt.log.ok("Compiled "+fileName+" -> "+newFile);
+	}
+
+	if (data.jsOutputFile) {
+		done();
+	}else{
+		if(++processed === data.js.length){
+			done();
+		}
+	}
     }
 
-    if (data.jsOutputFile) {
-      var doneFile = data.jsOutputFile+".done";
-      exec(command, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput);
-      while (!fs.existsSync(doneFile)) {
-	// Just Chill
-      }
-      if(fs.existsSync(doneFile)){
-	// Delete file
-	fs.unlinkSync(doneFile);
-      }
-      done();
+    function createFile(file){
+	// because closure compiler does not create dirs.
+        grunt.log.writeln("Create File: "+file);
+        grunt.file.write(file, '');
     }
 
-    if (data.jsOutputPath) {
-      var doneFiles = [];
-      for(var i = 0; i < data.js.length; i++){
+    for(var i = 0; i < data.js.length; i++){
         var fileCommand = " --js \""+data.js[i]+"\"",
         fileName = data.js[i].substring(data.js[i].lastIndexOf("/")+1),
-        newFile = data.jsOutputPath+fileName,
-	doneFileName = data.jsOutputPath+fileName+".done";
+        newFile = (data.jsOutputPath) ? data.jsOutputPath+fileName : data.jsOutputFile;
 
-	doneFiles.push(doneFileName);
-        
         fileCommand += " --js_output_file \""+newFile+"\"";
-        
+
         //Fatal error: path must be a string
         //reportFile = data.reportFile || newFile + '.report.txt';
-        
-        grunt.log.writeln("Create File: "+newFile);
-        grunt.file.write(newFile, '');
-        
-        exec(command+fileCommand+" && echo done > "+doneFileName, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, processOutput); 
+
+        createFile(newFile);
+
+        exec(command+fileCommand, { maxBuffer: data.maxBuffer * 1024, cwd: data.cwd }, function getOutput(err, stdout, stderr){
+                processOutput(err, stdout, stderr, this.fileName, this.newFile);
+        }.bind({
+                fileName: fileName,
+                newFile: newFile
+        }));
       }
-      //Fix for complete before finish bug
-      for(var i = 0; i < doneFiles.length; i++){
-      	// Block the event loop until the command has executed.
-	grunt.log.writeln("Waiting For File: "+doneFiles[i].substring(0,doneFiles[i].lastIndexOf(".")));
-      	while (!fs.existsSync(doneFiles[i])) {
-      		// Just Chill
-      	}
-	if(fs.existsSync(doneFiles[i])){
-		// Delete file
-                fs.unlinkSync(doneFiles[i]);
-	}
-      }
-      done();
-    }
   });
 
 };
